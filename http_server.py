@@ -53,3 +53,29 @@ class HTTPConnection(object):
         self._cancel_conn_timeout()
         self._conn_timeout = self.loop.call_later(
             timeout, self._conn_timeout_close)
+    def start_server(self):
+        if not self._server:
+            self.loop = asyncio.get_event_loop()
+            self._server = HTTPServer(self.router, self.http_parser, self.loop)
+            self._connection_handler = asyncio.start_server(
+                self._server.handle_connection,
+                host=self.host,
+                port=self.port,
+                reuse_address=True,
+                reuse_port=True,
+                loop=self.loop)
+
+            logger.info('Starting server on {0}:{1}'.format(
+                self.host,self.port))
+            self.loop.run_until_complete(self._connection_handler)
+            try:
+                self.loop.run_forever()
+                except KeyboardInterrupt:
+                    logger.info('Got signal, killing server')
+                except DiyFrameworkException as e:
+                    logger.error('Critical framework failure:')
+                    logger.error(e.traceback)
+                finally:
+                    self.loop.close()
+            else:
+                logger.info('Server already started - {0}'.format(self))
